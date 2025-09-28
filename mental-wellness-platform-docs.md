@@ -11,7 +11,14 @@
 **Deployment**: Local development environment, containerized and shippable  
 
 ### Core Value Proposition
-An intelligent mental wellness platform that combines local LLM inference, OpenAI GPT integration, real-time sentiment analysis, voice input processing, and cross-platform microservices architecture to provide personalized therapy support with continuous learning and progress tracking.
+An intelligent mental wellness platform that combines local LLM inference, OpenAI GPT integration, real-time sentiment analysis, voice### Testing Strategy
+
+### Unit Testing
+- **Python Services**: pytest with 90%+ code coverage for all services
+- **LLM Service**: Model inference testing and GPU memory validation
+- **Intent Service**: Classification accuracy and performance testing
+- **Analytics Service**: Data processing and visualization testing
+- **Frontend**: Jest + React Testing Library for UI componentsprocessing, and cross-platform microservices architecture to provide personalized therapy support with continuous learning and progress tracking.
 
 ---
 
@@ -22,37 +29,30 @@ An intelligent mental wellness platform that combines local LLM inference, OpenA
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Frontend (React/TypeScript)                  │
 ├─────────────────────────────────────────────────────────────────┤
-│                     API Gateway (Java)                         │
+│  Intent      │  Progress    │  Voice       │  Local LLM       │
+│  Classifier  │  Analytics   │  Processing  │  Service         │
+│  (Python)    │  (Python)    │  (Python)    │  (Python)        │
 ├─────────────────────────────────────────────────────────────────┤
-│  Intent      │  Progress    │  Voice       │  Therapy         │
-│  Classifier  │  Tracker     │  Processing  │  API Gateway     │
-│  (Python)    │  (C#)        │  (Python)    │  (Python)        │
-├─────────────────────────────────────────────────────────────────┤
-│  Local LLM   │  Milvus      │  MySQL       │  OpenAI GPT      │
-│  (3B/7B)     │  Vector DB   │  Database    │  Integration     │
+│  Local LLM   │  SQLite      │  OpenAI GPT  │  Vector Store    │
+│  (Phi-3)     │  Database    │  Integration │  (Optional)      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Multi-Language Service Architecture
+### Pure Python Service Architecture
 
-#### Python Services
-- **Intent Classification Service**: Routes users to appropriate therapy specialists
-- **Local LLM Inference Engine**: Navigation chatbot for system interaction
+#### Core Python Services
+- **Intent Classification Service**: Routes users to appropriate therapy specialists using FastAPI
+- **Local LLM Inference Engine**: Phi-3-mini powered navigation and conversation system
 - **Voice Processing Service**: OpenAI Whisper integration for multilingual transcription
-- **RAG Pipeline**: Milvus vector database integration for context retrieval
+- **Progress Analytics Engine**: Real-time mood tracking and matplotlib visualization
 - **OpenAI Integration Service**: GPT API calls for specialized therapy sessions
 
-#### Java Services
-- **API Gateway**: Main entry point, request routing, authentication
-- **Service Orchestration**: Manages communication between microservices
-- **Real-time Communication**: WebSocket connections for live chat
-- **Security Layer**: JWT tokens, rate limiting, request validation
-
-#### C# Services
-- **Progress Analytics Engine**: Real-time mood tracking and visualization
-- **Data Persistence Layer**: MySQL database operations
-- **Reporting Service**: Generate matplotlib-based progress graphs
-- **Background Task Scheduler**: Automated check-ins and reminders
+#### Service Communication
+- **FastAPI Framework**: All services built with modern async Python
+- **Direct HTTP/REST**: Service-to-service communication via HTTP APIs
+- **SQLite Database**: Lightweight, serverless database for all data persistence
+- **Real-time Updates**: WebSocket support through FastAPI for live chat
+- **Unified Architecture**: Single-language ecosystem for easier maintenance
 
 ---
 
@@ -172,17 +172,16 @@ collection_schema = {
    - Milvus Lite vector database
    - Basic CRUD operations
 
-3. **API Gateway (Java)**
-   - Spring Boot application
-   - Basic routing and authentication
-   - Health check endpoints
+3. **Service Integration (Python)**
+   - FastAPI service coordination
+   - Direct service-to-service communication
+   - Health check endpoints across all services
 
 #### Technologies Used:
 - Docker & Docker Compose
-- MySQL 8.0
-- Milvus Lite
-- Java Spring Boot
-- Python FastAPI
+- SQLite Database
+- Python FastAPI (all services)
+- Local LLM inference with transformers
 
 ### Phase 2: Local LLM Integration (Weeks 3-4)
 **Goal**: Implement local LLM inference and navigation chatbot
@@ -237,26 +236,26 @@ collection_schema = {
 **Goal**: Implement comprehensive progress tracking and visualization
 
 #### Deliverables:
-1. **Progress Analytics Engine (C#)**
-   - Real-time mood score calculations
-   - Session outcome tracking
-   - Statistical analysis of user progress
+1. **Progress Analytics Engine (Python)**
+   - Real-time mood score calculations with FastAPI
+   - Session outcome tracking and analysis
+   - Statistical analysis of user progress using pandas
 
 2. **Data Visualization System**
-   - Matplotlib integration for graph generation
+   - Native matplotlib integration for graph generation
    - Real-time progress charts (0-100 scale)
-   - Historical trend analysis
+   - Historical trend analysis with interactive charts
 
 3. **Automated Check-in System**
-   - Time-based mood assessments
+   - Time-based mood assessments via Python scheduling
    - Conversation trigger mechanisms
-   - Intervention scheduling
+   - FastAPI-based intervention scheduling
 
 #### Technologies Used:
-- C# .NET Core
-- Entity Framework
-- Python matplotlib
-- Background task scheduling
+- Python FastAPI
+- SQLite database integration
+- matplotlib & pandas for analytics
+- Python asyncio for background tasks
 
 ### Phase 5: RAG Implementation & Fine-tuning (Weeks 9-10)
 **Goal**: Implement knowledge retrieval and model optimization
@@ -333,60 +332,47 @@ numpy>=1.24.0
 scikit-learn>=1.3.0
 ```
 
-#### Java Stack
-```xml
-<!-- Spring Boot -->
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-web</artifactId>
-    <version>3.2.0</version>
-</dependency>
-<!-- WebSocket Support -->
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-websocket</artifactId>
-</dependency>
-<!-- MySQL Connector -->
-<dependency>
-    <groupId>mysql</groupId>
-    <artifactId>mysql-connector-java</artifactId>
-</dependency>
-```
+#### Additional Python Libraries
+```python
+# Analytics and visualization
+matplotlib>=3.8.0
+pandas>=2.1.0
+seaborn>=0.12.0
 
-#### C# Stack
-```xml
-<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
-<PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="7.0.0" />
-<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+# Database and ORM
+sqlalchemy>=2.0.0
+sqlite3  # Built into Python
+
+# Async and WebSocket support
+websockets>=11.0.0
+python-socketio>=5.9.0
+
+# Background task scheduling
+schedule>=1.2.0
+asyncio  # Built into Python
 ```
 
 ### Environment Configuration
 ```bash
 # .env file structure
 # Database Configuration
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
-MYSQL_DATABASE=mental_wellness
-MYSQL_USER=wellness_user
-MYSQL_PASSWORD=secure_password
+DATABASE_URL=sqlite:///./data/wellness_platform.db
+DATABASE_PATH=./data/wellness_platform.db
 
-# Milvus Configuration
-MILVUS_HOST=localhost
-MILVUS_PORT=19530
-
-# OpenAI Configuration
+# OpenAI Configuration (Optional)
 OPENAI_API_KEY=your_api_key_here
 OPENAI_MODEL=gpt-4
 
 # Local LLM Configuration
-LOCAL_MODEL_PATH=./models/mistral-7b-instruct-v0.2
+LOCAL_MODEL_PATH=./models/phi-3-mini-4k-instruct
 GPU_DEVICE=cuda:0
+MODEL_CACHE_DIR=./models
 
-# Service Ports
-PYTHON_SERVICE_PORT=8001
-JAVA_SERVICE_PORT=8002
-CSHARP_SERVICE_PORT=8003
+# Python Service Ports
+LLM_SERVICE_PORT=8000
+INTENT_SERVICE_PORT=8001
+ANALYTICS_SERVICE_PORT=8002
+VOICE_SERVICE_PORT=8003
 FRONTEND_PORT=3000
 ```
 
@@ -419,38 +405,38 @@ services:
       - etcd
       - minio
 
-  python-service:
-    build: ./services/python
+  llm-service:
+    build: ./services/python/llm
     ports:
-      - "8001:8001"
+      - "8000:8000"
     environment:
       - CUDA_VISIBLE_DEVICES=0
     volumes:
       - ./models:/app/models
-    depends_on:
-      - mysql
-      - milvus
+      - ./data:/app/data
 
-  java-service:
-    build: ./services/java
+  intent-service:
+    build: ./services/python/intent
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./data:/app/data
+
+  analytics-service:
+    build: ./services/python/analytics
     ports:
       - "8002:8002"
-    depends_on:
-      - mysql
-
-  csharp-service:
-    build: ./services/csharp
-    ports:
-      - "8003:8003"
-    depends_on:
-      - mysql
+    volumes:
+      - ./data:/app/data
 
   frontend:
     build: ./frontend
     ports:
       - "3000:3000"
     depends_on:
-      - java-service
+      - llm-service
+      - intent-service
+      - analytics-service
 
 volumes:
   mysql_data:
@@ -652,11 +638,12 @@ docker-compose ps
 
 ### Health Checks
 ```yaml
-# Health check endpoints for each service
-- Python Service: GET /health (LLM model status, GPU memory)
-- Java Service: GET /actuator/health (API gateway status)
-- C# Service: GET /health (Database connectivity)
-- Frontend: GET /api/status (Application health)
+# Health check endpoints for each Python service
+- LLM Service: GET /health (Phi-3 model status, GPU memory)
+- Intent Service: GET /health (Classification model status)
+- Analytics Service: GET /health (Database connectivity, matplotlib status)
+- Voice Service: GET /health (Whisper model status)
+- Frontend: GET /api/status (Application health, service connectivity)
 ```
 
 ### Logging Strategy
@@ -742,13 +729,16 @@ The modular, scalable architecture ensures the platform can evolve from a person
 ```
 mental-wellness-platform/
 ├── services/
-│   ├── python/          # Local LLM, OpenAI, Voice Processing
-│   ├── java/           # API Gateway, WebSocket Management  
-│   └── csharp/         # Progress Tracking, Data Analytics
+│   └── python/          # All Python services
+│       ├── llm/         # Local LLM Service (Phi-3)
+│       ├── intent/      # Intent Classification
+│       ├── analytics/   # Progress Tracking & Visualization
+│       └── voice/       # Voice Processing (Whisper)
 ├── frontend/           # React TypeScript Application
-├── data/              # Training Data, Knowledge Base
-├── models/            # Local LLM Models Storage
-├── sql/               # Database Schemas and Migrations
+├── data/              # SQLite Database & Training Data
+├── models/            # Local LLM Models Storage (Phi-3)
+├── sql/               # Database Schemas (SQLite)
+├── scripts/           # Automation Scripts
 ├── docker-compose.yml # Service Orchestration
 ├── .env.example       # Environment Configuration Template
 └── README.md          # Project Documentation

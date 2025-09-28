@@ -30,9 +30,9 @@ This project is designed for maximum automation. Most tasks can be executed via 
 
 # Service scaffolding
 ./scripts/create-services.sh
-# - Generates boilerplate code for all services
-# - Sets up API endpoints
-# - Creates Docker files
+# - Generates Python service boilerplate code
+# - Sets up API endpoints with FastAPI
+# - Creates Docker files for containerization
 # - Configures service communication
 ```
 
@@ -111,16 +111,16 @@ This project is designed for maximum automation. Most tasks can be executed via 
 ```bash
 # Analytics service setup
 ./scripts/setup-analytics.sh
-# - Creates C# analytics service
+# - Creates Python analytics service with matplotlib
 # - Implements mood tracking algorithms
-# - Sets up matplotlib integration
-# - Creates database triggers for real-time updates
+# - Sets up real-time progress visualization
+# - Creates database integration for analytics
 
 # Progress visualization
 ./scripts/create-progress-charts.sh
-# - Generates chart templates
-# - Implements real-time data streaming
-# - Creates dashboard components
+# - Generates Python-based chart templates
+# - Implements real-time data streaming with FastAPI
+# - Creates responsive dashboard components
 # - Sets up automated report generation
 ```
 
@@ -214,9 +214,9 @@ This project is designed for maximum automation. Most tasks can be executed via 
 ### Service Management
 ```bash
 # Start/stop individual services
-./scripts/service.sh python start
-./scripts/service.sh java restart
-./scripts/service.sh csharp stop
+./scripts/service.sh python-llm start
+./scripts/service.sh python-intent restart
+./scripts/service.sh python-analytics stop
 ./scripts/service.sh frontend start
 
 # Health monitoring

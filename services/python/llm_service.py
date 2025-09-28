@@ -4,6 +4,7 @@ Handles navigation chatbot and basic conversation using lightweight models
 """
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import os
@@ -11,8 +12,21 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from datetime import datetime
 import json
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI(title="Local LLM Service", version="1.0.0")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class ChatRequest(BaseModel):
     message: str
@@ -30,6 +44,7 @@ class ChatResponse(BaseModel):
 tokenizer = None
 model = None
 generator = None
+model_type = "none"  # Track which model is loaded
 
 # Navigation prompts and responses
 NAVIGATION_TEMPLATES = {
@@ -44,19 +59,51 @@ NAVIGATION_TEMPLATES = {
 }
 
 def load_model():
-    """Load the local language model"""
-    global tokenizer, model, generator
+    """Load the local language model - Phase 2 Enhanced with Phi-3-mini"""
+    global tokenizer, model, generator, model_type
     
     try:
-        model_name = "microsoft/DialoGPT-medium"  # Lightweight model for navigation
+        # Phase 2: Try to load Phi-3-mini first (best model for RTX 4060)
+        phi3_path = "./models/phi-3-mini-4k-instruct"
         
-        print(f"Loading model: {model_name}")
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForCausalLM.from_pretrained(model_name)
-        
-        # Add padding token if it doesn't exist
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token
+        if os.path.exists(phi3_path):
+            print("🤖 Loading Phi-3-mini-4k-instruct model...")
+            
+            # Configure 4-bit quantization for RTX 4060 optimization
+            from transformers import BitsAndBytesConfig
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4"
+            )
+            
+            tokenizer = AutoTokenizer.from_pretrained(phi3_path, trust_remote_code=True)
+            model = AutoModelForCausalLM.from_pretrained(
+                phi3_path,
+                quantization_config=quantization_config,
+                device_map="auto",
+                trust_remote_code=True
+            )
+            print("✅ Phi-3-mini loaded successfully with 4-bit quantization")
+            model_type = "phi3"
+            return "phi3"
+            
+        else:
+            # Fallback to DialoGPT if Phi-3 not available
+            print("⚠️ Phi-3-mini not found, using DialoGPT fallback...")
+            model_name = "microsoft/DialoGPT-medium"
+            
+            print(f"Loading model: {model_name}")
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            model = AutoModelForCausalLM.from_pretrained(model_name)
+            
+            # Add padding token if it doesn't exist
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token
+            
+            model_type = "dialogpt"
+            return "dialogpt"
         
         # Create pipeline for easier inference
         generator = pipeline(
@@ -76,12 +123,53 @@ def load_model():
         # Fallback to template-based responses
         generator = None
 
+def generate_phi3_response(message: str, context: str = None) -> Dict:
+    """Generate response using Phi-3-mini model with mental wellness prompts"""
+    
+    if model is None or tokenizer is None:
+        return {"response": "Model not loaded", "confidence": 0.0, "method": "error"}
+    
+    # Craft a mental wellness-focused prompt for Phi-3
+    system_prompt = "You are a compassionate mental wellness assistant. Provide helpful, supportive responses to help users navigate their mental health journey."
+    
+    if context:
+        full_prompt = f"System: {system_prompt}\nContext: {context}\nUser: {message}\nAssistant:"
+    else:
+        full_prompt = f"System: {system_prompt}\nUser: {message}\nAssistant:"
+    
+    try:
+        inputs = tokenizer(full_prompt, return_tensors="pt", truncation=True, max_length=512)
+        
+        with torch.no_grad():
+            outputs = model.generate(
+                inputs["input_ids"],
+                max_new_tokens=150,
+                temperature=0.7,
+                do_sample=True,
+                pad_token_id=tokenizer.eos_token_id
+            )
+        
+        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        # Extract just the assistant's response
+        response = response.split("Assistant:")[-1].strip()
+        
+        return {
+            "response": response,
+            "confidence": 0.85,
+            "method": "phi3_generation"
+        }
+        
+    except Exception as e:
+        print(f"Phi-3 generation error: {e}")
+        return {"response": "I'm having trouble processing that. Could you rephrase?", "confidence": 0.3, "method": "error"}
+
 def generate_navigation_response(message: str, context: str = None) -> Dict:
-    """Generate navigation response using templates or model"""
+    """Generate navigation response using templates, Phi-3, or fallback"""
+    global model_type
     
     message_lower = message.lower()
     
-    # Template-based responses for common navigation queries
+    # Template-based responses for common navigation queries (fastest)
     if any(word in message_lower for word in ["hello", "hi", "start", "begin"]):
         return {
             "response": NAVIGATION_TEMPLATES["greeting"],

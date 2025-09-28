@@ -1,0 +1,50 @@
+# Core ML and AI Libraries
+torch==2.1.0
+transformers==4.35.0
+accelerate==0.24.0
+bitsandbytes==0.41.3
+peft==0.6.0
+
+# Vector Database
+milvus-lite==2.3.0
+pymilvus==2.3.4
+
+# API and Web Framework
+fastapi==0.104.1
+uvicorn==0.24.0
+websockets==12.0
+python-multipart==0.0.6
+
+# OpenAI Integration
+openai==1.3.6
+whisper-openai==20231117
+
+# Database
+mysql-connector-python==8.2.0
+sqlalchemy==2.0.23
+
+# Audio Processing
+librosa==0.10.1
+soundfile==0.12.1
+speech-recognition==3.10.0
+
+# Data Processing
+numpy==1.24.3
+pandas==2.1.3
+scikit-learn==1.3.2
+
+# Visualization (for C# integration)
+matplotlib==3.7.2
+seaborn==0.13.0
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.0
+requests==2.31.0
+aiohttp==3.9.1
+tqdm==4.66.1
+
+# Development
+pytest==7.4.3
+black==23.11.0
+flake8==6.1.0

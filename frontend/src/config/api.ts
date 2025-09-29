@@ -1,31 +1,26 @@
-// API Configuration for Mental Wellness Platform
-// This file centralizes all service endpoints to avoid hardcoded URLs
+// API Configuration for Mental Wellness Platform - Unified Service
+// Single API endpoint architecture for simplified deployment
 
-// Get base URL from environment or default to localhost
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost';
+// Get unified API URL from environment or default to localhost:8000
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-// Get service ports from environment or use defaults
-const LLM_SERVICE_PORT = process.env.REACT_APP_LLM_SERVICE_PORT || '8000';
-const INTENT_SERVICE_PORT = process.env.REACT_APP_INTENT_SERVICE_PORT || '8001';
-const ANALYTICS_SERVICE_PORT = process.env.REACT_APP_ANALYTICS_SERVICE_PORT || '8002';
-
-// Service URLs
+// Unified service endpoints
 export const API_ENDPOINTS = {
-  // LLM Service
-  LLM_BASE: `${API_BASE_URL}:${LLM_SERVICE_PORT}`,
-  LLM_HEALTH: `${API_BASE_URL}:${LLM_SERVICE_PORT}/health`,
-  LLM_CHAT: `${API_BASE_URL}:${LLM_SERVICE_PORT}/chat`,
+  // Base URL
+  BASE: API_BASE_URL,
   
-  // Intent Classification Service
-  INTENT_BASE: `${API_BASE_URL}:${INTENT_SERVICE_PORT}`,
-  INTENT_HEALTH: `${API_BASE_URL}:${INTENT_SERVICE_PORT}/health`,
-  INTENT_CLASSIFY: `${API_BASE_URL}:${INTENT_SERVICE_PORT}/classify`,
+  // Health check
+  HEALTH: `${API_BASE_URL}/health`,
   
-  // Analytics Service
-  ANALYTICS_BASE: `${API_BASE_URL}:${ANALYTICS_SERVICE_PORT}`,
-  ANALYTICS_HEALTH: `${API_BASE_URL}:${ANALYTICS_SERVICE_PORT}/health`,
-  ANALYTICS_MOOD: `${API_BASE_URL}:${ANALYTICS_SERVICE_PORT}/mood`,
-  ANALYTICS_REPORT: `${API_BASE_URL}:${ANALYTICS_SERVICE_PORT}/report`,
+  // Chat/LLM endpoints
+  CHAT: `${API_BASE_URL}/api/chat`,
+  
+  // Intent classification endpoints
+  CLASSIFY: `${API_BASE_URL}/api/classify`,
+  
+  // Analytics endpoints
+  ANALYTICS: `${API_BASE_URL}/api/analytics`,
+  MOOD_RECORD: `${API_BASE_URL}/api/mood/record`,
 };
 
 // Default request configuration
@@ -33,16 +28,14 @@ export const DEFAULT_REQUEST_CONFIG = {
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 seconds timeout
+  timeout: 15000, // 15 seconds timeout for LLM responses
 };
 
 // Environment info for debugging
 export const ENV_INFO = {
   API_BASE_URL,
-  LLM_SERVICE_PORT,
-  INTENT_SERVICE_PORT,
-  ANALYTICS_SERVICE_PORT,
+  UNIFIED_SERVICE: true,
   NODE_ENV: process.env.NODE_ENV || 'development',
 };
 
-console.log('API Configuration loaded:', ENV_INFO);
+console.log('API Configuration loaded (Unified Service):', ENV_INFO);

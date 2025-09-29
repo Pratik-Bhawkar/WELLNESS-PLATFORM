@@ -12,13 +12,7 @@ interface Message {
   confidence?: number;
 }
 
-interface ChatResponse {
-  response: string;
-  intent: string;
-  mood_update: number;
-  next_action: string;
-  timestamp: string;
-}
+// Removed unused ChatResponse interface
 
 // Styled components for mental wellness theme
 const ChatContainer = styled.div`
@@ -127,34 +121,33 @@ const ChatInterface: React.FC = () => {
   useEffect(() => {
     const checkServices = async () => {
       try {
-        // Check if Python services are running using configuration
-        console.log('Checking services at:', {
-          LLM: API_ENDPOINTS.LLM_HEALTH,
-          Intent: API_ENDPOINTS.INTENT_HEALTH
-        });
+        // Check if unified API service is running
+        console.log('Checking unified service at:', API_ENDPOINTS.HEALTH);
         
-        const llmResponse = await fetch(API_ENDPOINTS.LLM_HEALTH);
-        const intentResponse = await fetch(API_ENDPOINTS.INTENT_HEALTH);
+        const healthResponse = await fetch(API_ENDPOINTS.HEALTH);
         
-        if (llmResponse.ok && intentResponse.ok) {
+        if (healthResponse.ok) {
+          const healthData = await healthResponse.json();
           setIsConnected(true);
-          console.log('Connected to Python services');
+          console.log('Connected to unified wellness service:', healthData);
           
-          // Add welcome message
-          const welcomeMessage: Message = {
-            id: Date.now().toString(),
-            content: "Hello! I'm your wellness assistant powered by Phi-3-mini. I'm here to help you with mental health support. How are you feeling today?",
-            sender: 'assistant',
-            timestamp: new Date()
-          };
-          setMessages([welcomeMessage]);
+          // Add welcome message only if no messages exist
+          if (messages.length === 0) {
+            const welcomeMessage: Message = {
+              id: Date.now().toString(),
+              content: "Hello! I'm your wellness assistant powered by Phi-3-mini. I'm here to help you with mental health support. How are you feeling today?",
+              sender: 'assistant',
+              timestamp: new Date()
+            };
+            setMessages([welcomeMessage]);
+          }
         } else {
           setIsConnected(false);
-          console.log('Service health check failed');
+          console.log('Unified service health check failed');
         }
       } catch (error) {
         setIsConnected(false);
-        console.log('Services not available yet, error:', error);
+        console.log('Unified service not available yet, error:', error);
       }
     };
 
@@ -163,14 +156,14 @@ const ChatInterface: React.FC = () => {
     const interval = setInterval(checkServices, 5000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [messages.length]); // Added messages.length dependency
 
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Send message function - Direct connection to Python services
+  // Send message function - Unified API service
   const sendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
 
@@ -187,9 +180,9 @@ const ChatInterface: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Step 1: Classify intent using configuration
-      console.log('Sending intent request to:', API_ENDPOINTS.INTENT_CLASSIFY);
-      const intentResponse = await fetch(API_ENDPOINTS.INTENT_CLASSIFY, {
+      // Step 1: Classify intent using unified API
+      console.log('Sending intent request to:', API_ENDPOINTS.CLASSIFY);
+      const intentResponse = await fetch(API_ENDPOINTS.CLASSIFY, {
         method: 'POST',
         ...DEFAULT_REQUEST_CONFIG,
         body: JSON.stringify({
@@ -205,14 +198,18 @@ const ChatInterface: React.FC = () => {
       const intentData = await intentResponse.json();
       console.log('Intent classified:', intentData);
 
-      // Step 2: Get response from LLM service using configuration  
-      console.log('Sending LLM request to:', API_ENDPOINTS.LLM_CHAT);
-      const llmResponse = await fetch(API_ENDPOINTS.LLM_CHAT, {
+      // Step 2: Get response from unified LLM API
+      console.log('Sending LLM request to:', API_ENDPOINTS.CHAT);
+      const llmResponse = await fetch(API_ENDPOINTS.CHAT, {
         method: 'POST',
         ...DEFAULT_REQUEST_CONFIG,
         body: JSON.stringify({
           message: messageText,
-          user_id: 1
+          user_id: 1,
+          conversation_history: messages.slice(-10).map(m => ({
+            role: m.sender === 'user' ? 'user' : 'assistant',
+            content: m.content
+          }))
         }),
       });
 
@@ -238,7 +235,7 @@ const ChatInterface: React.FC = () => {
       // Fallback response with detailed error information
       const errorMessage: Message = {
         id: Date.now().toString(),
-        content: `I'm having trouble connecting to the wellness services. Error: ${error}. Please ensure both services are running:\n- LLM Service: ${API_ENDPOINTS.LLM_BASE}\n- Intent Service: ${API_ENDPOINTS.INTENT_BASE}`,
+        content: `I'm having trouble connecting to the wellness service. Error: ${error}. Please ensure the unified service is running at: ${API_ENDPOINTS.BASE}`,
         sender: 'assistant',
         timestamp: new Date()
       };

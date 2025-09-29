@@ -1,8 +1,8 @@
-# Mental Wellness Platform - Phase 2 Complete! 🎉
+# Mental Wellness Platform - Unified Architecture Complete! 🎉
 
-> **Status**: Phase 2 Pure Python Architecture Complete (100% Success Rate)  
-> **Current**: React Frontend with Direct HTTP Chat Ready  
-> **Architecture**: Pure Python microservices with local Phi-3-mini LLM
+> **Status**: Unified Single-Port Architecture Complete (100% Success Rate)  
+> **Current**: React Frontend with Unified API Gateway Ready  
+> **Architecture**: Single FastAPI service with Phi-3-mini LLM on GPU
 
 ## 🎉 Phase 2 Status: 100% COMPLETE!
 
@@ -27,13 +27,14 @@
 - **✅ Service Scripts**: Smart startup automation with PowerShell
 - **✅ Git Cleanup**: Removed legacy Java/C# code from repository
 
-## 🏗️ Pure Python Architecture (Phase 2)
+## 🏗️ Unified Single-Port Architecture (Complete)
 
 ### Simplified Microservices Stack
-- **🐍 Python LLM Service**: Phi-3-mini with GPU acceleration (FastAPI) - Port 8000
-- **🧠 Python Intent Service**: Rule-based classification (FastAPI) - Port 8001  
-- **� Python Analytics Service**: SQLite + matplotlib (FastAPI) - Port 8002
-- **⚛️ React Frontend**: TypeScript with direct HTTP communication - Port 3000
+- **� Unified API Gateway**: All services combined into single FastAPI application - Port 8000
+  - **🐍 LLM Chat**: Phi-3-mini with GPU acceleration (`/api/chat`)
+  - **🧠 Intent Classification**: Rule-based classification (`/api/classify`)
+  - **📊 Analytics Service**: SQLite + matplotlib (`/api/analytics`, `/api/mood/record`)
+- **⚛️ React Frontend**: TypeScript with unified API communication - Port 3000
 
 ### Database Foundation
 - **📊 SQLite Database**: 65KB operational database with sample data
@@ -58,6 +59,16 @@
 
 **Impact**: ✅ 100% service compatibility and simplified deployment pipeline
 
+### Single-Port Architecture Benefits
+**Why unified API over multiple services:**
+- **Simplified Deployment**: One service to manage instead of three separate processes
+- **Reduced Complexity**: Single port eliminates port management and CORS issues
+- **Better Performance**: Shared resources and optimized memory usage
+- **Easier Scaling**: Single service architecture for future enhancements
+- **Cleaner Configuration**: One API endpoint for frontend integration
+
+**Strategy**: Unified API for Phase 2 → Microservices upgrade for Phase 3 if needed
+
 ### Direct HTTP vs WebSocket Communication
 **Why we chose direct HTTP:**
 - **Simplicity**: RESTful endpoints easier to debug and test
@@ -79,26 +90,34 @@
 
 ### ✅ Completed (100% Success Rate)
 ```
-Python Environment ✅ (3.11.9 with FastAPI, uvicorn, transformers)
+Python Environment ✅ (3.11.9 with FastAPI, uvicorn, transformers, bitsandbytes)
 Database Layer     ✅ (SQLite operational with sample data)
-LLM Service        ✅ (Phi-3-mini with GPU acceleration and 4-bit quantization)
-Intent Service     ✅ (Rule-based classification with health checks)
-Analytics Service  ✅ (matplotlib + SQLite integration)
-React Frontend     ✅ (TypeScript with styled-components and API config)
-Git Repository     ✅ (GitHub with proper Java/C# removal)
-Configuration      ✅ (Environment variables, CORS, and .env setup)
+Unified API        ✅ (Single FastAPI service with Phi-3-mini GPU acceleration)
+Intent Service     ✅ (Integrated into unified API with rule-based classification)
+Analytics Service  ✅ (Integrated into unified API with matplotlib + SQLite)
+React Frontend     ✅ (TypeScript with unified API configuration)
+Git Repository     ✅ (GitHub with proper cleanup and unified architecture)
+Configuration      ✅ (Environment variables, CORS, and single-port setup)
 ```
 
-## 🚀 Phase 2 Pure Python Architecture (Current)
+## 🚀 Unified Mental Wellness API (Current)
 
-### 🧠 Local LLM Service (Python + Phi-3-mini)
+### 🧠 Unified API Gateway (Single Service)
 ```python
 # Microsoft Phi-3-mini-4k-instruct with 4-bit quantization
 # GPU acceleration: RTX 4060 with CUDA 12.1 support  
 # Mental wellness prompt engineering and conversation flow
 # FastAPI with async endpoints for optimal performance
-# Port: 8000 | Endpoint: /chat | Health: /health
+# Port: 8000 | Endpoints: /api/chat, /api/classify, /api/analytics | Health: /health
 ```
+
+### Key Features
+- **🔄 Single Port Architecture**: All services consolidated into one FastAPI application
+- **🚀 GPU-Accelerated Responses**: Phi-3-mini generates real AI responses (no fallbacks)
+- **🧠 Intent Classification**: Rule-based classification for service routing
+- **📊 Mood Analytics**: SQLite database with matplotlib visualization
+- **⚡ High Performance**: 4-bit quantization for memory efficiency
+- **🔒 CORS Enabled**: Proper cross-origin support for React frontend
 
 ### 🎯 Intent Classification Service (Python)
 ```python
@@ -354,6 +373,6 @@ Invoke-RestMethod -Uri "http://localhost:8000/chat" -Method POST -Body $body -Co
 
 ---
 
-*Last Updated: Phase 2 Complete - September 28, 2025*  
+*Last Updated: Unified Architecture Complete - September 29, 2025*  
 *Current: Pure Python Architecture with Phi-3-mini LLM Integration*  
 *Next Phase: Advanced Features, Analytics Dashboard & Cloud Deployment*

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { API_ENDPOINTS, DEFAULT_REQUEST_CONFIG } from '../config/api';
+import SimpleVoiceRecorder from './SimpleVoiceRecorder';
 
 // Types following the API specifications
 interface Message {
@@ -251,6 +252,26 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  const handleVoiceTranscription = (transcription: string, emotion?: string) => {
+    // Set the transcribed text in the input field
+    setInputValue(transcription);
+    
+    // Add a visual indicator that this came from voice
+    const voiceMessage: Message = {
+      id: Date.now().toString(),
+      content: `🎤 Voice input: "${transcription}"${emotion ? ` (detected emotion: ${emotion})` : ''}`,
+      sender: 'user',
+      timestamp: new Date()
+    };
+    
+    setMessages((prev) => [...prev, voiceMessage]);
+    
+    // Automatically send the transcribed message
+    setTimeout(() => {
+      sendMessage();
+    }, 500);
+  };
+
   return (
     <ChatContainer>
       <Header>
@@ -281,12 +302,16 @@ const ChatInterface: React.FC = () => {
       </MessagesContainer>
 
       <InputContainer>
+        <SimpleVoiceRecorder
+          onTranscription={(text) => setInputValue(text)}
+          disabled={isLoading}
+        />
         <MessageInput
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="How are you feeling today? Type your message..."
+          placeholder="How are you feeling today? Type your message or use voice input above..."
           disabled={isLoading}
         />
         <SendButton onClick={sendMessage} disabled={isLoading || !inputValue.trim()}>

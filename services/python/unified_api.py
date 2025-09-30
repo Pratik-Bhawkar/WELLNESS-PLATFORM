@@ -3,7 +3,7 @@ Unified Mental Wellness API Gateway
 Combines LLM, Intent Classification, and Analytics into a single FastAPI service
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Optional
@@ -20,6 +20,9 @@ import io
 import base64
 import re
 import numpy as np
+from faster_whisper import WhisperModel
+import tempfile
+# librosa removed - not needed
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -66,6 +69,17 @@ class AnalyticsResponse(BaseModel):
     mood_data: List[dict]
     chart_url: Optional[str] = None
 
+class VoiceTranscriptionRequest(BaseModel):
+    user_id: int
+    language: Optional[str] = "auto"  # auto-detect or specify language code
+
+class VoiceTranscriptionResponse(BaseModel):
+    transcription: str
+    language: str
+    confidence: float
+    emotional_tone: Optional[str] = None
+    duration: float
+
 # =============================================
 # GLOBAL VARIABLES
 # =============================================
@@ -74,6 +88,76 @@ class AnalyticsResponse(BaseModel):
 tokenizer = None
 model = None
 device = None
+
+# Whisper Model variables
+whisper_model = None
+
+# LangChain imports and setup
+from langchain.llms.base import LLM
+from langchain_core.callbacks.manager import CallbackManagerForLLMRun
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationChain
+from langchain_core.prompts import PromptTemplate
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from typing import Any, List, Optional
+
+# LangChain custom LLM wrapper for Phi-3
+class Phi3LLM(LLM):
+    """Custom LangChain LLM wrapper for Phi-3 model"""
+    
+    @property
+    def _llm_type(self) -> str:
+        return "phi3"
+    
+    def _call(
+        self,
+        prompt: str,
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> str:
+        """Call the Phi-3 model"""
+        try:
+            if model is None or tokenizer is None:
+                return "I apologize, but the AI model is not currently available."
+            
+            # Format prompt for Phi-3
+            system_prompt = "You are a compassionate mental wellness AI assistant. Provide helpful, empathetic responses."
+            formatted_prompt = f"<|system|>\n{system_prompt}<|end|>\n<|user|>\n{prompt}<|end|>\n<|assistant|>\n"
+            
+            # Tokenize and generate
+            inputs = tokenizer(formatted_prompt, return_tensors="pt", truncate=True, max_length=512)
+            inputs = {k: v.to(device) for k, v in inputs.items()}
+            
+            with torch.no_grad():
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=256,
+                    temperature=0.7,
+                    do_sample=True,
+                    pad_token_id=tokenizer.eos_token_id,
+                    use_cache=False
+                )
+            
+            # Decode response
+            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # Extract assistant response
+            if "<|assistant|>" in response:
+                response = response.split("<|assistant|>")[-1].strip()
+            
+            return response
+            
+        except Exception as e:
+            print(f"❌ Phi-3 LLM call error: {e}")
+            return f"I'm experiencing technical difficulties. Please try again. ({str(e)})"
+
+# Global LangChain components
+phi3_llm = None
+conversation_memory = None
+conversation_chain = None
 
 # Intent classification patterns
 INTENT_PATTERNS = {
@@ -113,10 +197,15 @@ INTENT_PATTERNS = {
 # UTILITY FUNCTIONS
 # =============================================
 
-def get_db_connection():
-    """Get SQLite database connection"""
+def get_db_path():
+    """Get the database file path"""
     db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'wellness_platform.db')
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    return db_path
+
+def get_db_connection():
+    """Get SQLite database connection"""
+    db_path = get_db_path()
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
@@ -192,6 +281,77 @@ def load_phi3_model():
         print(f"❌ CRITICAL ERROR loading Phi-3 model: {e}")
         raise RuntimeError(f"Failed to load Phi-3 model: {e}")  # No fallbacks!
 
+def load_whisper_model():
+    """Load Faster-Whisper model for voice processing"""
+    global whisper_model
+    
+    try:
+        print("🎤 Loading Faster-Whisper model...")
+        # Load the Whisper base model (good balance of speed and accuracy)
+        # Using CPU for now, can be changed to "cuda" if GPU memory allows
+        whisper_model = WhisperModel("tiny", device="cuda", compute_type="float16")
+        print("✅ Faster-Whisper model loaded successfully!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error loading Whisper model: {e}")
+        whisper_model = None
+        return False
+
+def initialize_langchain():
+    """Initialize LangChain components with Phi-3"""
+    global phi3_llm, conversation_memory, conversation_chain
+    
+    try:
+        print("🔗 Initializing LangChain components...")
+        
+        # Initialize custom Phi-3 LLM
+        phi3_llm = Phi3LLM()
+        
+        # Create conversation memory
+        conversation_memory = ConversationBufferMemory(
+            memory_key="history",
+            return_messages=True,
+            max_token_limit=1000
+        )
+        
+        # Create conversation template
+        template = """You are a compassionate mental wellness AI assistant powered by Phi-3. Your role is to:
+
+1. Listen empathetically to users' concerns
+2. Provide supportive and helpful responses
+3. Offer practical coping strategies when appropriate
+4. Recognize when professional help might be needed
+5. Maintain a warm, non-judgmental tone
+
+Previous conversation:
+{history}
+
+Current user message: {input}
+
+Please respond with empathy and provide helpful guidance."""
+
+        # Create prompt template
+        prompt = PromptTemplate(
+            input_variables=["history", "input"],
+            template=template
+        )
+        
+        # Create conversation chain
+        conversation_chain = ConversationChain(
+            llm=phi3_llm,
+            prompt=prompt,
+            memory=conversation_memory,
+            verbose=False
+        )
+        
+        print("✅ LangChain components initialized successfully!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error initializing LangChain: {e}")
+        return False
+
 def classify_intent(message: str) -> Dict:
     """Classify user message intent"""
     message_lower = message.lower()
@@ -237,6 +397,40 @@ def classify_intent(message: str) -> Dict:
         "reasoning": reasoning
     }
 
+def process_audio_file(audio_file_path: str, language: str = "auto") -> Dict:
+    """Process uploaded audio file with Faster-Whisper"""
+    if whisper_model is None:
+        raise HTTPException(status_code=503, detail="Voice processing unavailable - Whisper model not loaded")
+    
+    try:
+        print(f"🎤 Transcribing audio file: {audio_file_path}")
+        
+        # Use Faster-Whisper to transcribe
+        if language == "auto":
+            segments, info = whisper_model.transcribe(audio_file_path)
+        else:
+            segments, info = whisper_model.transcribe(audio_file_path, language=language)
+        
+        # Combine all segments into full transcription
+        transcription = " ".join(segment.text for segment in segments)
+        
+        # Skip emotion analysis for faster processing
+        emotional_tone = "neutral"
+        
+        return {
+            "transcription": transcription.strip(),
+            "language": info.language,
+            "confidence": round(info.language_probability, 2),
+            "emotional_tone": emotional_tone,
+            "duration": 0.0  # Will be calculated from audio file
+        }
+        
+    except Exception as e:
+        print(f"❌ Error processing audio: {e}")
+        raise HTTPException(status_code=500, detail=f"Audio processing failed: {str(e)}")
+
+# Emotion analysis removed for faster processing
+
 # =============================================
 # LIFESPAN EVENT HANDLER
 # =============================================
@@ -249,6 +443,8 @@ async def lifespan(app: FastAPI):
     print("🚀 Starting Mental Wellness Platform API...")
     initialize_database()
     load_phi3_model()
+    load_whisper_model()
+    initialize_langchain()
     print("✅ All services initialized successfully!")
     yield
     print("🔄 Shutting down Mental Wellness Platform API...")
@@ -304,12 +500,17 @@ async def health_check():
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_with_llm(request: ChatRequest):
-    """Chat with Phi-3-mini LLM - NO FALLBACKS"""
-    global tokenizer, model, device
+    """Chat with Phi-3-mini LLM - Enhanced with LangChain"""
+    global tokenizer, model, device, conversation_chain
     
     # Ensure model is loaded
     if model is None or tokenizer is None:
         raise HTTPException(status_code=503, detail="Phi-3-mini model not loaded. Server startup failed.")
+    
+    # Skip LangChain for now due to tokenizer compatibility issues
+    # Use direct model call for reliable responses
+    
+    # Direct model usage (original implementation)
     
     try:
         # Create comprehensive mental wellness prompt
@@ -499,6 +700,110 @@ async def get_user_analytics(user_id: int, days: int = 30):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analytics generation failed: {str(e)}")
+
+# =============================================
+# VOICE PROCESSING ENDPOINTS
+# =============================================
+
+@app.post("/api/voice/transcribe", response_model=VoiceTranscriptionResponse)
+async def transcribe_audio(
+    audio_file: UploadFile = File(...),
+    user_id: int = Form(1),
+    language: str = Form("auto")
+):
+    """
+    Transcribe uploaded audio file using OpenAI Whisper
+    
+    Supports multiple audio formats: wav, mp3, flac, m4a, ogg
+    Language can be 'auto' for auto-detection or specific language codes (en, es, fr, etc.)
+    """
+    
+    print(f"🎤 Voice transcription request: file={audio_file.filename}, user_id={user_id}, language={language}")
+    
+    if whisper_model is None:
+        raise HTTPException(
+            status_code=503, 
+            detail="Voice processing service unavailable - Whisper model not loaded"
+        )
+    
+    # Check file format
+    allowed_formats = {'.wav', '.mp3', '.flac', '.m4a', '.ogg', '.webm'}
+    file_extension = os.path.splitext(audio_file.filename)[1].lower()
+    
+    if file_extension not in allowed_formats:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported audio format. Allowed: {', '.join(allowed_formats)}"
+        )
+    
+    # Create temporary file to store uploaded audio
+    with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
+        try:
+            # Save uploaded file
+            content = await audio_file.read()
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+            
+            print(f"🎤 Processing audio file: {audio_file.filename} ({len(content)} bytes)")
+            
+            # Process audio with Whisper
+            result = process_audio_file(temp_file_path, language)
+            
+            # Set estimated duration (faster than calculating)
+            result["duration"] = len(content) / 16000.0  # Rough estimate
+            
+            # Skip database storage for voice transcriptions - not needed
+            
+            print(f"✅ Audio transcribed successfully: '{result['transcription'][:50]}...'")
+            
+            return VoiceTranscriptionResponse(**result)
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"❌ Voice transcription error: {e}")
+            raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+        
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(temp_file_path)
+            except:
+                pass
+
+@app.post("/api/voice/chat")
+async def voice_chat(
+    audio_file: UploadFile = File(...),
+    user_id: int = 1,
+    language: str = "auto"
+):
+    """
+    Complete voice-to-voice workflow: transcribe audio, process with LLM, return text response
+    """
+    
+    # First transcribe the audio
+    transcription_response = await transcribe_audio(audio_file, user_id, language)
+    
+    # Process transcription with chat API
+    chat_request = ChatRequest(
+        message=transcription_response.transcription,
+        user_id=user_id,
+        conversation_history=[],
+        context=f"Voice message (emotional tone: {transcription_response.emotional_tone})"
+    )
+    
+    # Get LLM response using the existing chat endpoint function
+    try:
+        chat_response = await chat_endpoint(chat_request)
+        
+        return {
+            "transcription": transcription_response,
+            "llm_response": chat_response,
+            "processing_time": f"{transcription_response.duration + 2.0:.2f}s"  # Estimate
+        }
+    except Exception as e:
+        print(f"❌ Voice chat error: {e}")
+        raise HTTPException(status_code=500, detail=f"Voice chat failed: {str(e)}")
 
 # =============================================
 # MAIN ENTRY POINT

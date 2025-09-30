@@ -2,7 +2,7 @@
 // Single API endpoint architecture for simplified deployment
 
 // Get unified API URL from environment or default to localhost:8000
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 // Unified service endpoints
 export const API_ENDPOINTS = {
@@ -21,6 +21,10 @@ export const API_ENDPOINTS = {
   // Analytics endpoints
   ANALYTICS: `${API_BASE_URL}/api/analytics`,
   MOOD_RECORD: `${API_BASE_URL}/api/mood/record`,
+  
+  // Voice processing endpoints
+  VOICE_TRANSCRIBE: `${API_BASE_URL}/api/voice/transcribe`,
+  VOICE_CHAT: `${API_BASE_URL}/api/voice/chat`,
 };
 
 // Default request configuration

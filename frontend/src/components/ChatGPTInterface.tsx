@@ -40,7 +40,7 @@ const ChatGPTInterface: React.FC = () => {
     const controller = new AbortController();
     
     // Use longer timeout for chat requests (LLM takes time to generate)
-    const actualTimeout = url.includes('/api/chat') ? 60000 : timeout; // 60 seconds for chat
+    const actualTimeout = url.includes('/api/chat') ? 180000 : timeout; // 3 minutes for chat (MCP processing needs more time)
     
     const timeoutId = setTimeout(() => {
       console.log(`⏰ Request timeout after ${actualTimeout}ms for ${url}`);

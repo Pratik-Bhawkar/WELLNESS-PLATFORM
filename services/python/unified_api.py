@@ -103,6 +103,16 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from typing import Any, List, Optional
 
+# Import Model Context Protocol
+import sys
+import os
+# Add current directory to Python path for importing mcp_context
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+from mcp_context import mcp_manager, ConversationContext
+
 # LangChain custom LLM wrapper for Phi-3
 class Phi3LLM(LLM):
     """Custom LangChain LLM wrapper for Phi-3 model"""
@@ -118,13 +128,22 @@ class Phi3LLM(LLM):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> str:
-        """Call the Phi-3 model"""
+        """Call the Phi-3 model with MCP context awareness"""
         try:
             if model is None or tokenizer is None:
                 return "I apologize, but the AI model is not currently available."
             
-            # Format prompt for Phi-3
-            system_prompt = "You are a compassionate mental wellness AI assistant. Provide helpful, empathetic responses."
+            # Extract MCP context from kwargs if available
+            mcp_context = kwargs.get('mcp_context')
+            user_message = kwargs.get('user_message', prompt)
+            
+            if mcp_context:
+                # Use MCP-generated dynamic prompt
+                system_prompt = mcp_manager.generate_dynamic_prompt(mcp_context, user_message)
+            else:
+                # Fallback to basic prompt if no MCP context
+                system_prompt = "You are a compassionate mental wellness AI assistant. Provide helpful, empathetic responses."
+            
             formatted_prompt = f"<|system|>\n{system_prompt}<|end|>\n<|user|>\n{prompt}<|end|>\n<|assistant|>\n"
             
             # Tokenize and generate
@@ -523,47 +542,26 @@ async def health_check():
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_with_llm(request: ChatRequest):
-    """Chat with Phi-3-mini LLM - Enhanced with LangChain"""
+    """Chat with Phi-3-mini LLM - Enhanced with Model Context Protocol (MCP)"""
     global tokenizer, model, device, conversation_chain
     
     # Ensure model is loaded
     if model is None or tokenizer is None:
         raise HTTPException(status_code=503, detail="Phi-3-mini model not loaded. Server startup failed.")
     
-    # Skip LangChain for now due to tokenizer compatibility issues
-    # Use direct model call for reliable responses
-    
-    # Direct model usage (original implementation)
-    
     try:
-        # Create comprehensive mental wellness prompt
+        # Format conversation history - simple approach
         conversation_history = ""
         if request.conversation_history:
-            for msg in request.conversation_history[-5:]:  # Last 5 messages for context
+            for msg in request.conversation_history[-3:]:  # Last 3 messages only
                 role = "User" if msg.get("role") == "user" else "Assistant"
                 conversation_history += f"{role}: {msg.get('content', '')}\n"
         
-        system_prompt = """You are Phi-3-mini, a compassionate AI mental wellness assistant. You provide empathetic, helpful responses for mental health support.
-
-GUIDELINES:
-- Be warm, understanding, and non-judgmental
-- Provide practical mental health advice and coping strategies  
-- Suggest professional help when appropriate for serious issues
-- Keep responses concise (2-3 sentences) but caring
-- Focus on emotional support and wellness techniques
-- Use encouraging, hopeful language
-
-CONVERSATION CONTEXT:
-{history}
-
-USER MESSAGE: {message}
-
-RESPONSE:"""
-
-        full_prompt = system_prompt.format(
-            history=conversation_history if conversation_history else "This is the start of a new conversation.",
-            message=request.message
-        )
+        # Create simple prompt
+        if conversation_history:
+            full_prompt = f"{conversation_history}User: {request.message}\nAssistant:"
+        else:
+            full_prompt = f"User: {request.message}\nAssistant:"
 
         # Tokenize input
         inputs = tokenizer(
@@ -594,19 +592,17 @@ RESPONSE:"""
         # Decode and clean response
         full_response = tokenizer.decode(outputs[0], skip_special_tokens=True)
         
-        # Extract only the new response (after "RESPONSE:")
-        if "RESPONSE:" in full_response:
-            response = full_response.split("RESPONSE:")[-1].strip()
-        else:
-            # Fallback: take text after the input prompt
-            response = full_response[len(full_prompt):].strip()
+        # Extract only the new response
+        response = full_response[len(full_prompt):].strip()
         
         # Clean up response
         response = response.split("USER:")[0].split("User:")[0].strip()
         
         if not response or len(response) < 10:
             raise ValueError("Generated response too short or empty")
-            
+        
+        print(f"✅ Response Generated | Length: {len(response)}")
+        
         return ChatResponse(
             response=response,
             confidence=0.95,
@@ -817,7 +813,7 @@ async def voice_chat(
     
     # Get LLM response using the existing chat endpoint function
     try:
-        chat_response = await chat_endpoint(chat_request)
+        chat_response = await chat_with_llm(chat_request)
         
         return {
             "transcription": transcription_response,

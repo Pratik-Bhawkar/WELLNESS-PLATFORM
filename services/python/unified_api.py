@@ -25,6 +25,9 @@ import tempfile
 # librosa removed - not needed
 from dotenv import load_dotenv
 
+# RAG System imports
+from rag_system import MentalWellnessRAG
+
 # Load environment variables from root .env file
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
@@ -91,6 +94,9 @@ device = None
 
 # Whisper Model variables
 whisper_model = None
+
+# RAG System variable
+rag_system = None
 
 # LangChain imports and setup
 from langchain.llms.base import LLM
@@ -394,6 +400,34 @@ Please respond with empathy and provide helpful guidance."""
         print(f"❌ Error initializing LangChain: {e}")
         return False
 
+def initialize_rag_system():
+    """Initialize RAG system with mental wellness documents"""
+    global rag_system
+    
+    try:
+        print("📚 Initializing RAG system...")
+        
+        # Get documents directory path
+        documents_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'documents')
+        
+        # Initialize RAG system
+        rag_system = MentalWellnessRAG(documents_dir)
+        
+        if rag_system.initialize():
+            stats = rag_system.get_statistics()
+            print(f"✅ RAG system initialized successfully!")
+            print(f"📊 Loaded {stats['total_chunks']} chunks from {len(stats['documents_by_source'])} documents")
+            return True
+        else:
+            print("❌ Failed to initialize RAG system")
+            rag_system = None
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error initializing RAG system: {e}")
+        rag_system = None
+        return False
+
 def classify_intent(message: str) -> Dict:
     """Classify user message intent"""
     message_lower = message.lower()
@@ -487,6 +521,7 @@ async def lifespan(app: FastAPI):
     load_phi3_model()
     load_whisper_model()
     initialize_langchain()
+    initialize_rag_system()
     print("✅ All services initialized successfully!")
     yield
     print("🔄 Shutting down Mental Wellness Platform API...")
@@ -557,11 +592,43 @@ async def chat_with_llm(request: ChatRequest):
                 role = "User" if msg.get("role") == "user" else "Assistant"
                 conversation_history += f"{role}: {msg.get('content', '')}\n"
         
-        # Create simple prompt
+        # Get RAG context if available
+        rag_context = ""
+        if rag_system:
+            try:
+                # Detect context type for better RAG retrieval
+                context_type = None
+                message_lower = request.message.lower()
+                if any(word in message_lower for word in ["anxious", "anxiety", "worry", "panic"]):
+                    context_type = "anxiety"
+                elif any(word in message_lower for word in ["sad", "depressed", "depression", "hopeless"]):
+                    context_type = "depression"
+                elif any(word in message_lower for word in ["stress", "overwhelmed", "pressure"]):
+                    context_type = "stress"
+                elif any(word in message_lower for word in ["mindful", "meditation", "breathing"]):
+                    context_type = "therapy"
+                
+                # Retrieve relevant context
+                rag_context = rag_system.get_rag_response_context(request.message, context_type)
+                if rag_context:
+                    print(f"📚 RAG Context Retrieved: {len(rag_context)} characters")
+                else:
+                    print("📚 No relevant RAG context found")
+                    
+            except Exception as e:
+                print(f"⚠️ RAG retrieval error: {e}")
+                rag_context = ""
+        
+        # Create enhanced prompt with RAG context
+        system_prompt = "You are a friendly mental wellness companion. Respond naturally and helpfully."
+        
+        if rag_context:
+            system_prompt += f"\n\n{rag_context}\nUse this information to provide more helpful and accurate responses, but keep your response conversational and natural."
+        
         if conversation_history:
-            full_prompt = f"{conversation_history}User: {request.message}\nAssistant:"
+            full_prompt = f"{system_prompt}\n\n{conversation_history}User: {request.message}\nAssistant:"
         else:
-            full_prompt = f"User: {request.message}\nAssistant:"
+            full_prompt = f"{system_prompt}\n\nUser: {request.message}\nAssistant:"
 
         # Tokenize input
         inputs = tokenizer(
@@ -601,12 +668,17 @@ async def chat_with_llm(request: ChatRequest):
         if not response or len(response) < 10:
             raise ValueError("Generated response too short or empty")
         
-        print(f"✅ Response Generated | Length: {len(response)}")
+        # Log response with RAG status
+        rag_status = "with RAG context" if rag_context else "without RAG context"
+        print(f"✅ Response Generated ({rag_status}) | Length: {len(response)}")
+        
+        # Determine model name based on RAG usage
+        model_name = "phi-3-mini-4k-instruct-rag" if rag_context else "phi-3-mini-4k-instruct"
         
         return ChatResponse(
             response=response,
             confidence=0.95,
-            model_used="phi-3-mini-4k-instruct",
+            model_used=model_name,
             tokens_used=len(outputs[0])
         )
             

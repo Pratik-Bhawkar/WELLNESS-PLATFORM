@@ -1,13 +1,8 @@
 import React from 'react';
-import './App.css';
-import ChatInterface from './components/ChatInterface';
+import ChatGPTInterface from './components/ChatGPTInterface';
 
 function App() {
-  return (
-    <div className="App">
-      <ChatInterface />
-    </div>
-  );
+  return <ChatGPTInterface />;
 }
 
 export default App;

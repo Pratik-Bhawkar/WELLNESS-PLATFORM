@@ -25,8 +25,8 @@ import tempfile
 # librosa removed - not needed
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from root .env file
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
 # =============================================
 # REQUEST/RESPONSE MODELS
@@ -198,8 +198,18 @@ INTENT_PATTERNS = {
 # =============================================
 
 def get_db_path():
-    """Get the database file path"""
-    db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'wellness_platform.db')
+    """Get the database file path from environment variable"""
+    # Get database path from environment variable
+    db_path_env = os.getenv("DB_PATH", "data/wellness_platform.db")
+    
+    # If relative path, make it relative to project root
+    if not os.path.isabs(db_path_env):
+        project_root = os.path.join(os.path.dirname(__file__), '..', '..')
+        db_path = os.path.join(project_root, db_path_env)
+    else:
+        db_path = db_path_env
+    
+    # Ensure directory exists
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     return db_path
 
@@ -243,8 +253,16 @@ def load_phi3_model():
     print(f"🔧 CUDA Version: {torch.version.cuda}")
     print(f"💾 GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
     
-    model_name = "microsoft/Phi-3-mini-4k-instruct"
-    model_path = os.path.join("..", "..", "models", "phi-3-mini-4k-instruct")
+    # Get model configuration from environment variables
+    model_name = os.getenv("MODEL_NAME", "microsoft/Phi-3-mini-4k-instruct")
+    model_path_env = os.getenv("MODEL_PATH", "models/phi-3-mini-4k-instruct")
+    
+    # If relative path, make it relative to project root
+    if not os.path.isabs(model_path_env):
+        project_root = os.path.join(os.path.dirname(__file__), '..', '..')
+        model_path = os.path.join(project_root, model_path_env)
+    else:
+        model_path = model_path_env
     
     try:
         # Load model from local path if exists, otherwise from HuggingFace
@@ -286,10 +304,15 @@ def load_whisper_model():
     global whisper_model
     
     try:
-        print("🎤 Loading Faster-Whisper model...")
-        # Load the Whisper base model (good balance of speed and accuracy)
-        # Using CPU for now, can be changed to "cuda" if GPU memory allows
-        whisper_model = WhisperModel("tiny", device="cuda", compute_type="float16")
+        # Get voice configuration from environment variables
+        voice_model = os.getenv("VOICE_MODEL", "tiny")  # tiny for speed, base for accuracy
+        voice_device = os.getenv("VOICE_DEVICE", "cuda")
+        
+        print(f"🎤 Loading Faster-Whisper model: {voice_model}")
+        print(f"🔧 Voice device: {voice_device}")
+        
+        # Load the Whisper model with environment configuration
+        whisper_model = WhisperModel(voice_model, device=voice_device, compute_type="float16")
         print("✅ Faster-Whisper model loaded successfully!")
         return True
         
@@ -811,5 +834,21 @@ async def voice_chat(
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("API_PORT", "8000"))
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    
+    # Get server configuration from environment variables
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8000"))
+    log_level = os.getenv("LOG_LEVEL", "info").lower()
+    debug = os.getenv("DEBUG", "true").lower() == "true"
+    
+    print(f"🌐 Starting Mental Wellness Platform API")
+    print(f"📡 Host: {host}:{port}")
+    print(f"🔧 Debug mode: {debug}")
+    print(f"📝 Log level: {log_level}")
+    print(f"🔄 Environment: {os.getenv('ENVIRONMENT', 'development')}")
+    
+    # Only use reload in development mode and when running as script
+    if debug and __name__ == "__main__":
+        uvicorn.run("unified_api:app", host=host, port=port, log_level=log_level, reload=True)
+    else:
+        uvicorn.run(app, host=host, port=port, log_level=log_level)
